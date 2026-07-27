@@ -19,6 +19,32 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  // ブラウザのリロード(F5等)時にセッションを自動復元する
+  useEffect(() => {
+    const savedSession = sessionStorage.getItem('aether_active_session');
+    if (savedSession) {
+      try {
+        const parsed = JSON.parse(savedSession);
+        fetch(`${API_BASE}/api/list?path=${encodeURIComponent(parsed.initialPath)}`, {
+          headers: { 'x-session-id': parsed.sessionId }
+        })
+        .then(res => {
+          if (res.ok) return res.json();
+          throw new Error('Session expired');
+        })
+        .then(data => {
+          setSessionInfo(parsed);
+          setTreeItems(data.items);
+        })
+        .catch(() => {
+          sessionStorage.removeItem('aether_active_session');
+        });
+      } catch (e) {
+        sessionStorage.removeItem('aether_active_session');
+      }
+    }
+  }, []);
+
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
@@ -37,6 +63,7 @@ export default function App() {
         throw new Error(data.error || '接続に失敗しました。');
       }
       setSessionInfo(data);
+      sessionStorage.setItem('aether_active_session', JSON.stringify(data));
       await fetchDirList(data.initialPath, data.sessionId, true);
     } catch (err) {
       setConnectError(err.message);
@@ -95,6 +122,7 @@ export default function App() {
     } catch (e) {
       console.error(e);
     } finally {
+      sessionStorage.removeItem('aether_active_session');
       setSessionInfo(null);
       setSelectedFile(null);
       setTreeItems([]);

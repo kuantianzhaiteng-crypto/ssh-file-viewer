@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Folder, FolderOpen, FileText, Image as ImageIcon, FileCode, 
   Database, File, ChevronRight, ChevronDown, RefreshCw 
@@ -15,6 +15,35 @@ export default function SidebarTree({
 }) {
   const [expandedDirs, setExpandedDirs] = useState(new Set([rootPath]));
   const [dirContents, setDirContents] = useState({ [rootPath]: items });
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (items) {
+      setDirContents(prev => ({ ...prev, [rootPath]: items }));
+    }
+  }, [items, rootPath]);
+
+  const handleRefreshTree = async () => {
+    setRefreshing(true);
+    try {
+      if (onRefresh) {
+        await onRefresh();
+      }
+      // 展開中の全サブディレクトリも順次最新のファイル一覧を取得して再レンダリングする
+      const updatedContents = {};
+      for (const path of expandedDirs) {
+        if (path !== rootPath && onFetchSubdir) {
+          const subItems = await onFetchSubdir(path);
+          if (subItems) updatedContents[path] = subItems;
+        }
+      }
+      if (Object.keys(updatedContents).length > 0) {
+        setDirContents(prev => ({ ...prev, ...updatedContents }));
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const toggleDir = async (item) => {
     const isExpanded = expandedDirs.has(item.path);
@@ -137,11 +166,12 @@ export default function SidebarTree({
       }}>
         <span>ファイルツリー</span>
         <button 
-          onClick={onRefresh} 
-          title="ルートを更新" 
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px' }}
+          onClick={handleRefreshTree} 
+          disabled={refreshing}
+          title="ツリー全体を最新状態に更新" 
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: refreshing ? 'var(--accent-blue)' : 'var(--text-muted)', padding: '2px' }}
         >
-          <RefreshCw size={14} />
+          <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
         </button>
       </div>
 

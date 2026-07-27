@@ -19,6 +19,7 @@ export default function FileViewer({ file, sessionId, theme, onDownload }) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [imgBg, setImgBg] = useState('transparent'); // 'transparent' | 'white' | 'black'
+  const [imgTimestamp, setImgTimestamp] = useState(Date.now());
 
   const ext = file ? file.name.split('.').pop().toLowerCase() : '';
   const isImage = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'].includes(ext);
@@ -26,32 +27,34 @@ export default function FileViewer({ file, sessionId, theme, onDownload }) {
   const isJson = ['json'].includes(ext);
   const isCsv = ['csv', 'tsv'].includes(ext);
 
-  useEffect(() => {
-    if (!file || isImage) return;
-
-    const fetchContent = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`${API_BASE}/api/read?path=${encodeURIComponent(file.path)}`, {
-          headers: { 'x-session-id': sessionId }
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || `HTTP ${res.status}`);
-        }
-        const text = await res.text();
-        setContent(text);
-        if (isCsv) setViewMode('table');
-        else if (isJson || isMarkdown) setViewMode('formatted');
-        else setViewMode('raw');
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+  const fetchContent = async () => {
+    if (!file || isImage) {
+      if (isImage) setImgTimestamp(Date.now());
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/read?path=${encodeURIComponent(file.path)}`, {
+        headers: { 'x-session-id': sessionId }
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${res.status}`);
       }
-    };
+      const text = await res.text();
+      setContent(text);
+      if (isCsv) setViewMode('table');
+      else if (isJson || isMarkdown) setViewMode('formatted');
+      else setViewMode('raw');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchContent();
   }, [file, sessionId, isImage]);
 
@@ -71,7 +74,7 @@ export default function FileViewer({ file, sessionId, theme, onDownload }) {
     );
   }
 
-  const streamUrl = `${API_BASE}/api/stream?path=${encodeURIComponent(file.path)}&sessionId=${sessionId}`;
+  const streamUrl = `${API_BASE}/api/stream?path=${encodeURIComponent(file.path)}&sessionId=${sessionId}&t=${imgTimestamp}`;
 
   // CSVをテーブルとしてパースする簡易ヘルパー
   const parseCsvToTable = (csvText) => {
@@ -209,7 +212,17 @@ export default function FileViewer({ file, sessionId, theme, onDownload }) {
             </div>
           )}
 
-          <button onClick={() => onDownload(file)} className="btn btn-primary" style={{ marginLeft: '8px' }}>
+          <button 
+            onClick={fetchContent} 
+            disabled={loading} 
+            className="btn" 
+            style={{ marginLeft: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}
+            title="ファイル内容を最新状態に再読み込み"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            <span>更新</span>
+          </button>
+          <button onClick={() => onDownload(file)} className="btn btn-primary" style={{ marginLeft: '4px' }}>
             <Download size={14} />
             <span>保存</span>
           </button>
