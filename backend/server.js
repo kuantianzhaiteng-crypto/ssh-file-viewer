@@ -212,7 +212,10 @@ app.post('/api/disconnect', requireSession, async (req, res) => {
 const distPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  app.get('*', (req, res) => {
+  app.use((req, res) => {
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'API endpoint not found.' });
+    }
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
