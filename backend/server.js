@@ -4,6 +4,8 @@ const Client = require('ssh2-sftp-client');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -208,7 +210,29 @@ app.post('/api/disconnect', requireSession, async (req, res) => {
   }
 });
 
-// 7. フロントエンドの静的ファイル配信（一体型スタンドアロン動作対応）
+// 7. アップロード API
+app.post('/api/upload', requireSession, upload.single('file'), async (req, res) => {
+  const targetPath = req.query.path || req.body.path;
+  if (!targetPath) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    return res.status(400).json({ error: '保存先のパスが指定されていません。' });
+  }
+  if (!req.file) {
+    return res.status(400).json({ error: 'ファイルがアップロードされていません。' });
+  }
+
+  try {
+    await req.session.sftp.put(req.file.path, targetPath);
+    fs.unlinkSync(req.file.path);
+    res.json({ success: true, message: 'アップロード完了しました。' });
+  } catch (err) {
+    console.error(`Upload Error (${targetPath}):`, err);
+    if (req.file) fs.unlinkSync(req.file.path);
+    res.status(500).json({ error: `アップロードに失敗しました: ${err.message}` });
+  }
+});
+
+// 8. フロントエンドの静的ファイル配信（一体型スタンドアロン動作対応）
 const distPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));

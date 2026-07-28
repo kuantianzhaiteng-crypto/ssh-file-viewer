@@ -9,6 +9,7 @@ export default function ConnectModal({ onConnect, loading, error }) {
   const [password, setPassword] = useState('');
   const [privateKey, setPrivateKey] = useState('');
   const [passphrase, setPassphrase] = useState('');
+  const [saveCredentials, setSaveCredentials] = useState(false);
   const [history, setHistory] = useState([]);
 
   useEffect(() => {
@@ -19,7 +20,15 @@ export default function ConnectModal({ onConnect, loading, error }) {
   }, []);
 
   const saveToHistory = () => {
-    const newEntry = { host, port, username, authType, privateKey: authType === 'key' ? privateKey : undefined };
+    const newEntry = { 
+      host, 
+      port, 
+      username, 
+      authType, 
+      privateKey: authType === 'key' ? privateKey : undefined,
+      password: saveCredentials && authType === 'password' ? password : undefined,
+      passphrase: saveCredentials && authType === 'key' ? passphrase : undefined
+    };
     const filtered = history.filter(h => !(h.host === host && h.username === username));
     const updated = [newEntry, ...filtered].slice(0, 5);
     setHistory(updated);
@@ -39,12 +48,34 @@ export default function ConnectModal({ onConnect, loading, error }) {
     });
   };
 
-  const selectHistory = (h) => {
+  const selectHistory = (h, e) => {
+    if (e) e.stopPropagation();
     setHost(h.host);
     setPort(h.port || '22');
     setUsername(h.username);
     setAuthType(h.authType || 'password');
     if (h.privateKey) setPrivateKey(h.privateKey);
+    if (h.password) setPassword(h.password);
+    if (h.passphrase) setPassphrase(h.passphrase);
+
+    // 鍵認証（パスフレーズ不要）またはパスワード等が記憶済みの場合はワンクリックで即座に接続する
+    const canAutoConnect = (h.authType === 'key' && h.privateKey && !h.passphrase) || h.password || h.passphrase;
+    if (canAutoConnect) {
+      onConnect({
+        host: h.host,
+        port: h.port || '22',
+        username: h.username,
+        password: h.authType === 'password' ? h.password : undefined,
+        privateKey: h.authType === 'key' ? h.privateKey : undefined,
+        passphrase: h.authType === 'key' ? h.passphrase : undefined
+      });
+    } else {
+      // 記憶されていない場合はパスワード入力欄へ自動フォーカス
+      setTimeout(() => {
+        const passInput = document.querySelector('input[type="password"]');
+        if (passInput) passInput.focus();
+      }, 50);
+    }
   };
 
   const deleteHistory = (e, index) => {
@@ -151,9 +182,15 @@ export default function ConnectModal({ onConnect, loading, error }) {
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            <ShieldCheck size={14} color="var(--accent-blue)" />
-            <span>編集無効（Read-Only）のため、サーバー上のファイルが変更・削除されることはありません。</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
+              <input type="checkbox" checked={saveCredentials} onChange={e => setSaveCredentials(e.target.checked)} />
+              <span>次回からパスワード（または鍵情報）も記憶してワンクリック接続する</span>
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
+              <ShieldCheck size={14} color="var(--accent-blue)" />
+              <span>編集無効（Read-Only）のため、サーバー上のファイルが変更・削除されることはありません。</span>
+            </div>
           </div>
 
           <button type="submit" disabled={loading} className="btn btn-primary" style={{ marginTop: '8px', padding: '10px', width: '100%', fontSize: '14px', justifyContent: 'center' }}>
@@ -172,24 +209,46 @@ export default function ConnectModal({ onConnect, loading, error }) {
               <Clock size={14} />
               <span>最近の接続</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {history.map((h, i) => (
-                <div key={i} onClick={() => selectHistory(h)} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '8px 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                  fontSize: '12px', backgroundColor: 'var(--bg-sidebar)',
-                  transition: 'background-color 0.15s ease'
-                }} className="history-item">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                    <Globe size={14} color="var(--text-secondary)" />
-                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{h.username}@{h.host}</span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>({h.port || 22})</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {history.map((h, i) => {
+                const isAuto = (h.authType === 'key' && h.privateKey && !h.passphrase) || h.password || h.passphrase;
+                return (
+                  <div key={i} onClick={(e) => selectHistory(h, e)} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 12px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                    fontSize: '12px', backgroundColor: 'var(--bg-sidebar)',
+                    border: '1px solid var(--border-color)',
+                    transition: 'all 0.15s ease'
+                  }} 
+                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--accent-blue)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--bg-sidebar)'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
+                  className="history-item">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                      <Globe size={15} color="var(--accent-blue)" />
+                      <div>
+                        <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '13px' }}>{h.username}@{h.host}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '2px' }}>
+                          ポート: {h.port || 22} | {h.authType === 'key' ? '🔑 鍵認証' : (h.password ? '⚡ 1クリック接続可' : '🔐 パスワード入力必要')}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{
+                        fontSize: '11px', fontWeight: '500', 
+                        color: isAuto ? '#fff' : 'var(--accent-blue)', 
+                        backgroundColor: isAuto ? 'var(--accent-blue)' : 'rgba(35, 131, 226, 0.12)', 
+                        padding: '5px 10px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px'
+                      }}>
+                        <span>{isAuto ? '接続' : '選択'}</span>
+                        <ArrowRight size={12} />
+                      </span>
+                      <button onClick={(e) => deleteHistory(e, i)} title="履歴から削除" style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
-                  <button onClick={(e) => deleteHistory(e, i)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}>
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

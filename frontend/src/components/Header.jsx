@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, LogOut, Moon, Sun, Terminal, Shield, Eye } from 'lucide-react';
+import { Download, LogOut, Moon, Sun, Terminal, Upload, Eye } from 'lucide-react';
 
 export default function Header({ 
   sessionInfo, 
@@ -7,7 +7,8 @@ export default function Header({
   onDownload, 
   onDisconnect, 
   theme, 
-  onToggleTheme 
+  onToggleTheme,
+  onUpload
 }) {
   return (
     <header style={{
@@ -56,15 +57,15 @@ export default function Header({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '4px',
-          padding: '4px 8px', borderRadius: 'var(--radius-sm)',
-          backgroundColor: 'var(--bg-sidebar)', color: 'var(--text-muted)',
-          fontSize: '11px', fontWeight: '500', marginRight: '6px'
-        }}>
-          <Shield size={13} color="#27ae60" />
-          <span>Read-Only</span>
-        </div>
+        <button 
+          onClick={onUpload}
+          className="btn btn-primary"
+          style={{ padding: '5px 12px', marginRight: '6px' }}
+          title="ファイルをアップロード"
+        >
+          <Upload size={14} />
+          <span>アップロード</span>
+        </button>
 
         {selectedFile && selectedFile.type !== 'directory' && (
           <button 

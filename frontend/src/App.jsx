@@ -3,6 +3,7 @@ import ConnectModal from './components/ConnectModal';
 import SidebarTree from './components/SidebarTree';
 import Header from './components/Header';
 import FileViewer from './components/FileViewer';
+import UploadModal from './components/UploadModal';
 import { API_BASE } from './config';
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
   const [treeItems, setTreeItems] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [loadingPath, setLoadingPath] = useState(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -148,6 +150,7 @@ export default function App() {
             onDisconnect={handleDisconnect}
             theme={theme}
             onToggleTheme={toggleTheme}
+            onUpload={() => setShowUploadModal(true)}
           />
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
             <SidebarTree
@@ -166,6 +169,19 @@ export default function App() {
               onDownload={handleDownload}
             />
           </div>
+
+          {showUploadModal && (
+            <UploadModal
+              sessionId={sessionInfo.sessionId}
+              defaultPath={selectedFile ? (selectedFile.type === 'directory' ? selectedFile.path : selectedFile.path.replace(/\/[^/]+$/, '')) : sessionInfo.initialPath}
+              onClose={() => setShowUploadModal(false)}
+              onUploadComplete={() => {
+                setShowUploadModal(false);
+                // アップロード成功後、現在のルートをリフレッシュする
+                fetchDirList(sessionInfo.initialPath, sessionInfo.sessionId, true);
+              }}
+            />
+          )}
         </>
       )}
     </div>
