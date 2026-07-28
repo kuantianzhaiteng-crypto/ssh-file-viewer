@@ -13,8 +13,9 @@ node_modules
 /frontend/node_modules
 
 # Build outputs
-/frontend/dist
-dist
+# (We want to track dist so users don't have to build it themselves)
+# /frontend/dist
+# dist
 dist-ssr
 
 # Environment & local files
